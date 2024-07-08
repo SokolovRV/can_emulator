@@ -53,7 +53,7 @@ public class Main {
         }
         if (comHandler.getInputBufferBytesCount() > 0) {
             comHandler.readBytes(comHandler.getInputBufferBytesCount(), frtmotMs);
-            comHandler.sendBytes(getBytesForCom("S4"));
+            comHandler.sendBytes(getBytesForCom("S8"));
             comHandler.sendBytes(getBytesForCom("A0"));
             comHandler.sendBytes(getBytesForCom("M0"));
             comHandler.sendBytes(getBytesForCom("O"));
@@ -82,7 +82,7 @@ public class Main {
             byte[] b = new byte[cnt];
             System.arraycopy(pdu, i * 8, b, 0, cnt);
             ss[i] = String.format("t%03d%01d", msg[0], cnt) + b2h(b);
-            System.out.println("    Frame: " + ss[i]);
+            //System.out.println("    Frame: " + ss[i]);
         }
         for (String s : ss)
             comHandler.sendBytes(getBytesForCom(s));
@@ -99,7 +99,7 @@ public class Main {
     }
 
     public static byte[] receiveMsg(ComHandler comHandler) {
-        System.out.println("Receive msg..");
+        System.out.println("Wait msg..");
         if (comHandler.getInputBufferBytesCount() > 0)
             comHandler.readBytes(comHandler.getInputBufferBytesCount(), frtmotMs);
         byte[] res = new byte[0];
@@ -110,6 +110,7 @@ public class Main {
         while (true) {
             if (comHandler.getInputBufferBytesCount() > 0) {
                 if (!frst) {
+                    System.out.println("Receive msg..");
                     frst = true;
                     t = System.currentTimeMillis();
                 }
@@ -153,7 +154,7 @@ public class Main {
         byte[] buf = new byte[256];
         int p = 0;
         for (String fr : frames) {
-            System.out.println("    Frame: " + fr);
+            //System.out.println("    Frame: " + fr);
             byte[] frb = Hex.decode(fr.substring(5));
             System.arraycopy(frb, 0, buf, p, frb.length);
             p += frb.length;

@@ -84,7 +84,7 @@ public class ComHandler {
                     serial.readBytes();
                 }
                 serial.writeBytes(bytes);
-                System.out.println("[" + (System.currentTimeMillis() & 0xffff) + "] COM: TX>>> " + bytesToHex(bytes));
+                //System.out.println("[" + (System.currentTimeMillis() & 0xffff) + "] COM: TX>>> " + bytesToHex(bytes));
                 long startTime = System.currentTimeMillis();
                 while (serial.getOutputBufferBytesCount() > 0) {
                     if ((System.currentTimeMillis() - startTime) > 500) {
@@ -112,7 +112,7 @@ public class ComHandler {
         if (serial != null && serial.isOpened()) {
             try {
                 bytes = serial.readBytes(cntBytes, timeOutMs);
-                System.out.println("[" + (System.currentTimeMillis() & 0xffff) + "] COM: RX<<< " + bytesToHex(bytes));
+                //System.out.println("[" + (System.currentTimeMillis() & 0xffff) + "] COM: RX<<< " + bytesToHex(bytes));
             } catch (SerialPortException | SerialPortTimeoutException e) {
                 try {
                     if (serial.getInputBufferBytesCount() > 0) {

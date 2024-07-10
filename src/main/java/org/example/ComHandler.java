@@ -22,15 +22,15 @@ public class ComHandler {
         this.baud = baud;
     }
 
-    public String getCom() {
+    public synchronized String getCom() {
         return com;
     }
 
-    public int getBaud() {
+    public synchronized int getBaud() {
         return baud;
     }
 
-    public boolean open() {
+    public synchronized boolean open() {
         if (serial == null || !serial.isOpened()) {
             serial = new SerialPort(com);
             try {
@@ -44,7 +44,7 @@ public class ComHandler {
         return true;
     }
 
-    public boolean serialPortIsOpened() {
+    public synchronized boolean serialPortIsOpened() {
         if (serial != null) {
             return serial.isOpened();
         }
@@ -52,7 +52,7 @@ public class ComHandler {
         return false;
     }
 
-    public boolean close() {
+    public synchronized boolean close() {
         if (serial != null) {
             try {
                 serial.closePort();
@@ -65,7 +65,7 @@ public class ComHandler {
         return false;
     }
 
-    public int getInputBufferBytesCount() {
+    public synchronized int getInputBufferBytesCount() {
         if (serial != null) {
             try {
                 return serial.getInputBufferBytesCount();
@@ -106,7 +106,7 @@ public class ComHandler {
         return false;
     }
 
-    public byte[] readBytes(int cntBytes, int timeOutMs) {
+    public synchronized byte[] readBytes(int cntBytes, int timeOutMs) {
         byte[] bytes = new byte[0];
 
         if (serial != null && serial.isOpened()) {

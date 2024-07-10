@@ -3,6 +3,8 @@ package org.example;
 import org.example.modbus.ModbusFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
+
 import org.bouncycastle.util.encoders.Hex;
 import org.example.modbus.ModbusHandlerResult;
 import org.example.modbus.constants.ModbusErrorCodes;
@@ -21,20 +23,47 @@ public class Main {
     public static int frtmotMs = 20;
     public static final int CNT_DEVICE = 2;
     public static ModbusFactory modbusFactory = ModbusFactory.getInstance();
+
+    public static final int MIN_VALUE = 1000;
+    public static final int MAX_VALUE = 20000;
+
+    public static String emerencyMsg = "t101419270a0a\r";
+    public static int getRandomValue() {
+        Random random = new Random();
+        int randomValue = random.nextInt(MAX_VALUE - MIN_VALUE + 1);
+        return randomValue + MIN_VALUE;
+    }
     public static void main(String[] args) {
         System.out.println("Start.");
         System.out.println("Open com..");
         ComHandler comHandler = new ComHandler(com, baud);
         comHandler.open();
         System.out.println("Done.");
-        canInit(comHandler);
-        while (true) {
-            byte[] rqst = receiveMsg(comHandler);
-            ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
-            if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
-                sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
+        if (canInit(comHandler)) {
+            new Thread() {
+                @Override
+                public void run() {
+                    while (true) {
+                        try {
+                            Thread.sleep(getRandomValue());
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                        System.out.println("\n>>>>EMERENCY MSG START!!!<<<<");
+                        comHandler.sendBytes(emerencyMsg.getBytes());
+                        System.out.println(emerencyMsg);
+                        System.out.println(">>>>EMERENCY MSG END!!!<<<<\n");
+                    }
+                }
+            }.start();
+            while (true) {
+                byte[] rqst = receiveMsg(comHandler);
+                ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
+                if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
+                    sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
+                }
+                System.out.println("\n");
             }
-            System.out.println("\n");
         }
     }
 

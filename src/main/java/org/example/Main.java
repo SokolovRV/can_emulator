@@ -31,9 +31,9 @@ public class Main {
     public static int getRandomValue() {
         Random random = new Random();
         int randomValue = random.nextInt(MAX_VALUE - MIN_VALUE + 1);
-        return randomValue + MIN_VALUE;
+        return 5000;
     }
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         System.out.println("Start.");
         System.out.println("Open com..");
         ComHandler comHandler = new ComHandler(com, baud);
@@ -55,16 +55,40 @@ public class Main {
                         System.out.println(">>>>EMERENCY MSG END!!!<<<<\n");
                     }
                 }
-            }.start();
+            };
             while (true) {
                 byte[] rqst = receiveMsg(comHandler);
                 ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
                 if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
                     sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
                 }
+
                 System.out.println("\n");
             }
         }
+        /*while (true) {
+                /*byte[] rqst = receiveMsg(comHandler);
+                ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
+                if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
+                    sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
+                }
+            while (comHandler.getInputBufferBytesCount() < 6);
+            byte [] startB = comHandler.readBytes(6, 10);
+            int totalB = 0;
+            if (startB[1] == 0x04 || startB[1] == 0x03)
+                totalB = 8;
+            else
+                totalB = 9 + (((startB[4] & 0xff) << 8) | (startB[5] & 0xff));
+            byte[] rqst = new byte[totalB];
+            System.arraycopy(startB, 0, rqst, 0, 6);
+            while (comHandler.getInputBufferBytesCount() < (totalB - 6));
+            byte[] ostB = comHandler.readBytes(totalB - 6, 10);
+            System.arraycopy(ostB, 0, rqst, 6, ostB.length);
+            ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
+            if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
+                comHandler.sendBytes(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)));
+            }
+        }*/
     }
 
     public static byte[] getBytesForCom(String s) {
@@ -82,7 +106,7 @@ public class Main {
         }
         if (comHandler.getInputBufferBytesCount() > 0) {
             comHandler.readBytes(comHandler.getInputBufferBytesCount(), frtmotMs);
-            comHandler.sendBytes(getBytesForCom("S8"));
+            comHandler.sendBytes(getBytesForCom("S6"));
             comHandler.sendBytes(getBytesForCom("A0"));
             comHandler.sendBytes(getBytesForCom("M0"));
             comHandler.sendBytes(getBytesForCom("O"));

@@ -20,8 +20,12 @@ import static org.example.modbus.constants.ModbusFunctionCodes.*;
 public class Main {
     public static String com = "COM14";
     public static int baud = 2000000;
+
+    public static String canSpeed = "S6";
+    public static final boolean rsInterface = false;
     public static int frtmotMs = 20;
-    public static final int CNT_DEVICE = 2;
+    public static final int CNT_DEVICE = 30;
+    public static final int CNT_PLC = 100;
     public static ModbusFactory modbusFactory = ModbusFactory.getInstance();
 
     public static final int MIN_VALUE = 1000;
@@ -31,7 +35,7 @@ public class Main {
     public static int getRandomValue() {
         Random random = new Random();
         int randomValue = random.nextInt(MAX_VALUE - MIN_VALUE + 1);
-        return 5000;
+        return randomValue;
     }
     public static void main(String[] args) throws InterruptedException {
         System.out.println("Start.");
@@ -39,56 +43,54 @@ public class Main {
         ComHandler comHandler = new ComHandler(com, baud);
         comHandler.open();
         System.out.println("Done.");
-        if (canInit(comHandler)) {
-            new Thread() {
-                @Override
-                public void run() {
-                    while (true) {
-                        try {
-                            Thread.sleep(getRandomValue());
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
+        if (!rsInterface) {
+            if (canInit(comHandler)) {
+                new Thread() {
+                    @Override
+                    public void run() {
+                        while (true) {
+                            try {
+                                Thread.sleep(getRandomValue());
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                            System.out.println("\n>>>>EMERENCY MSG START!!!<<<<");
+                            comHandler.sendBytes(emerencyMsg.getBytes());
+                            System.out.println(emerencyMsg);
+                            System.out.println(">>>>EMERENCY MSG END!!!<<<<\n");
                         }
-                        System.out.println("\n>>>>EMERENCY MSG START!!!<<<<");
-                        comHandler.sendBytes(emerencyMsg.getBytes());
-                        System.out.println(emerencyMsg);
-                        System.out.println(">>>>EMERENCY MSG END!!!<<<<\n");
                     }
+                };
+                while (true) {
+                    byte[] rqstCan = receiveMsg(comHandler);
+                    ModbusHandlerResult mbRqstCan = modbusFactory.modbusParseRequest(rqstCan);
+                    if (mbRqstCan.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
+                        sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqstCan)), comHandler);
+                    }
+
+                    System.out.println("\n");
                 }
-            };
+            }
+        } else {
             while (true) {
-                byte[] rqst = receiveMsg(comHandler);
+                while (comHandler.getInputBufferBytesCount() < 6) ;
+                byte[] startB = comHandler.readBytes(6, 10);
+                int totalB = 0;
+                if (startB[1] == 0x04 || startB[1] == 0x03)
+                    totalB = 8;
+                else
+                    totalB = 9 + (((startB[4] & 0xff) << 8) | (startB[5] & 0xff));
+                byte[] rqst = new byte[totalB];
+                System.arraycopy(startB, 0, rqst, 0, 6);
+                while (comHandler.getInputBufferBytesCount() < (totalB - 6)) ;
+                byte[] ostB = comHandler.readBytes(totalB - 6, 10);
+                System.arraycopy(ostB, 0, rqst, 6, ostB.length);
                 ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
                 if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
-                    sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
+                    comHandler.sendBytes(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)));
                 }
-
-                System.out.println("\n");
             }
         }
-        /*while (true) {
-                /*byte[] rqst = receiveMsg(comHandler);
-                ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
-                if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
-                    sendMbMsg(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)), comHandler);
-                }
-            while (comHandler.getInputBufferBytesCount() < 6);
-            byte [] startB = comHandler.readBytes(6, 10);
-            int totalB = 0;
-            if (startB[1] == 0x04 || startB[1] == 0x03)
-                totalB = 8;
-            else
-                totalB = 9 + (((startB[4] & 0xff) << 8) | (startB[5] & 0xff));
-            byte[] rqst = new byte[totalB];
-            System.arraycopy(startB, 0, rqst, 0, 6);
-            while (comHandler.getInputBufferBytesCount() < (totalB - 6));
-            byte[] ostB = comHandler.readBytes(totalB - 6, 10);
-            System.arraycopy(ostB, 0, rqst, 6, ostB.length);
-            ModbusHandlerResult mbRqst = modbusFactory.modbusParseRequest(rqst);
-            if (mbRqst.getErrorCode() == ModbusErrorCodes.NO_ERROR) {
-                comHandler.sendBytes(modbusFactory.modbusParseResponse(modbusProcess(mbRqst)));
-            }
-        }*/
     }
 
     public static byte[] getBytesForCom(String s) {
@@ -106,7 +108,7 @@ public class Main {
         }
         if (comHandler.getInputBufferBytesCount() > 0) {
             comHandler.readBytes(comHandler.getInputBufferBytesCount(), frtmotMs);
-            comHandler.sendBytes(getBytesForCom("S6"));
+            comHandler.sendBytes(getBytesForCom(canSpeed));
             comHandler.sendBytes(getBytesForCom("A0"));
             comHandler.sendBytes(getBytesForCom("M0"));
             comHandler.sendBytes(getBytesForCom("O"));
@@ -224,8 +226,6 @@ public class Main {
         return res;
     }
 
-    private static int[][] dimming = new int[CNT_DEVICE][2];
-    private static long[] dt = new long[CNT_DEVICE];
     public static ModbusHandlerResult modbusProcess(ModbusHandlerResult request) {
         ModbusHandlerResult response = new ModbusHandlerResult(ModbusErrorCodes.NO_ERROR);
 
@@ -267,6 +267,9 @@ public class Main {
         return response;
     }
 
+    private static int[][] dimming = new int[CNT_DEVICE][CNT_PLC];
+    private static long[] dt = new long[CNT_DEVICE];
+
     private static int readModbusRegisters(int[] values, int startAddress, int deviceAddress) {
         for (int index = 0; index < values.length; index++) {
             int addr = index + startAddress;
@@ -282,30 +285,32 @@ public class Main {
                 case 5:
                     values[index] = 90;
                     break;
+                case 6:
+                    values[index] = 1;
+                    break;
                 case 7:
                     values[index] = (int) (dt[deviceAddress - 1] & 0xffff);
                     break;
                 case 8:
                     values[index] = (int) ((dt[deviceAddress - 1] >> 16) & 0xffff);
                     break;
-                case 6:
-                    values[index] = 1;
-                    break;
                 default:
-                    if (isBetween(addr, 1000, 1007)) {
+                    if (isBetween(addr, 1000, (1000 + CNT_PLC * 4) - 1)) {
                         if ((addr - 1000) % 4 == 0)
                             values[index] = (((addr - 1000) / 4) + 1) * 1000;
                         else
                             values[index] = 0;
-                    } else if (isBetween(addr, 1008, 5000)) {
+                    } else if (isBetween(addr, 1000 + CNT_PLC * 4, 4999)) {
                         values[index] = 0;
-                    } else if (isBetween(addr, 10000, 10009)) {
-                        switch (addr - 10000) {
+                    } else if (addr >= 10000) {
+                        int plc = (addr - 10000) / 50;
+                        int plcDataAddr = addr - (10000 + plc * 50);
+                        switch (plcDataAddr) {
                             case 0:
-                                values[index] = (addr - 10000) / 50 + 1;
+                                values[index] = plc + 1;
                                 break;
                             case 1:
-                                values[index] = ((addr - 10000) / 50 + 1) * 1000;
+                                values[index] = (plc + 1) * 1000;
                                 break;
                             case 2:
                             case 3:
@@ -313,54 +318,23 @@ public class Main {
                                 values[index] = 0;
                                 break;
                             case 5:
-                                values[index] = 90;
+                                values[index] = 100;
                                 break;
                             case 6:
                                 values[index] = 1;
                                 break;
                             case 7:
-                                values[index] = dimming[deviceAddress - 1][0];
+                                values[index] = dimming[deviceAddress - 1][plc];
                                 break;
                             case 8:
                             case 9:
                                 values[index] = ((int) (Math.random() * 65535)) & 0xffff;
                                 break;
                             default:
-                                break;
+                                return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
                         }
-                    } else if ((isBetween(addr, 10050, 10059))) {
-                        switch (addr - 10050) {
-                            case 0:
-                                values[index] = (addr - 10000) / 50 + 1;
-                                break;
-                            case 1:
-                                values[index] = ((addr - 10000) / 50 + 1) * 1000;
-                                break;
-                            case 2:
-                            case 3:
-                            case 4:
-                                values[index] = 0;
-                                break;
-                            case 5:
-                                values[index] = 90;
-                                break;
-                            case 6:
-                                values[index] = 0;
-                                break;
-                            case 7:
-                                values[index] = dimming[deviceAddress - 1][1];
-                                break;
-                            case 8:
-                            case 9:
-                                values[index] = ((int) (Math.random() * 65535)) & 0xffff;
-                                break;
-                            default:
-                                break;
-                        }
-
                     } else
                         return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
-                    break;
             }
         }
 
@@ -378,14 +352,20 @@ public class Main {
                     dt[deviceAddress - 1] = (dt[deviceAddress - 1] & (~(0xffffL << 16)))
                             | ((values[index] & 0xffffL) << 16);
                     break;
-                case 10007:
-                    dimming[deviceAddress - 1][0] = values[index];
-                    break;
-                case 10057:
-                    dimming[deviceAddress - 1][1] = values[index];
-                    break;
-                default:
-                    return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
+                default: {
+                    if (addr >= 10000) {
+                        int plc = (addr - 10000) / 50;
+                        int plcDataAddr = addr - (10000 + plc * 50);
+                        switch (plcDataAddr) {
+                            case 7:
+                                dimming[deviceAddress - 1][plc] = values[index];
+                                break;
+                            default:
+                                return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
+                        }
+                    } else
+                        return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
+                }
             }
         }
 

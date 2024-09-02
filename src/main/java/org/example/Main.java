@@ -25,7 +25,7 @@ public class Main {
     public static final boolean rsInterface = false;
     public static int frtmotMs = 20;
     public static final int CNT_DEVICE = 30;
-    public static final int CNT_PLC = 100;
+    public static final int CNT_PLC = 20;
     public static ModbusFactory modbusFactory = ModbusFactory.getInstance();
 
     public static final int MIN_VALUE = 1000;
@@ -268,6 +268,12 @@ public class Main {
     }
 
     private static int[][] dimming = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] vMin = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] vMax = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] aMin = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] aMax = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] emerFlag = new int[CNT_DEVICE][CNT_PLC];
+    private static int[][] loadPwmFlag = new int[CNT_DEVICE][CNT_PLC];
     private static long[] dt = new long[CNT_DEVICE];
 
     private static int readModbusRegisters(int[] values, int startAddress, int deviceAddress) {
@@ -294,6 +300,22 @@ public class Main {
                 case 8:
                     values[index] = (int) ((dt[deviceAddress - 1] >> 16) & 0xffff);
                     break;
+                case 9:
+                    values[index] = (int) ((dt[deviceAddress - 1] >> 32) & 0xffff);
+                    break;
+                case 10:
+                    values[index] = (int) ((dt[deviceAddress - 1] >> 48) & 0xffff);
+                    break;
+                case 20:
+                    values[index] = 1234;
+                    break;
+                case 21:
+                    values[index] = 5678;
+                case 22:
+                    values[index] = -1234;
+                    break;
+                case 23:
+                    values[index] = -5678;
                 default:
                     if (isBetween(addr, 1000, (1000 + CNT_PLC * 4) - 1)) {
                         if ((addr - 1000) % 4 == 0)
@@ -307,18 +329,17 @@ public class Main {
                         int plcDataAddr = addr - (10000 + plc * 50);
                         switch (plcDataAddr) {
                             case 0:
-                                values[index] = plc + 1;
-                                break;
-                            case 1:
                                 values[index] = (plc + 1) * 1000;
                                 break;
+                            case 1:
                             case 2:
                             case 3:
-                            case 4:
                                 values[index] = 0;
                                 break;
-                            case 5:
+                            case 4:
                                 values[index] = 100;
+                            case 5:
+                                values[index] = 0;
                                 break;
                             case 6:
                                 values[index] = 1;
@@ -327,8 +348,30 @@ public class Main {
                                 values[index] = dimming[deviceAddress - 1][plc];
                                 break;
                             case 8:
+                                values[index] = dimming[deviceAddress - 1][plc];
+                                break;
                             case 9:
+                            case 10:
+                            case 11:
                                 values[index] = ((int) (Math.random() * 65535)) & 0xffff;
+                                break;
+                            case 12:
+                                values[index] = vMin[deviceAddress -1][plc];
+                                break;
+                            case 13:
+                                values[index] = vMax[deviceAddress -1][plc];
+                                break;
+                            case 14:
+                                values[index] = aMin[deviceAddress -1][plc];
+                                break;
+                            case 15:
+                                values[index] = aMax[deviceAddress -1][plc];
+                                break;
+                            case 16:
+                                values[index] = emerFlag[deviceAddress -1][plc];
+                                break;
+                            case 17:
+                                values[index] = loadPwmFlag[deviceAddress -1][plc];
                                 break;
                             default:
                                 return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
@@ -351,6 +394,12 @@ public class Main {
                 case 8:
                     dt[deviceAddress - 1] = (dt[deviceAddress - 1] & (~(0xffffL << 16)))
                             | ((values[index] & 0xffffL) << 16);
+                case 9:
+                    dt[deviceAddress - 1] = (dt[deviceAddress - 1] & (~(0xffffL << 16)))
+                            | ((values[index] & 0xffffL) << 32);
+                case 10:
+                    dt[deviceAddress - 1] = (dt[deviceAddress - 1] & (~(0xffffL << 16)))
+                            | ((values[index] & 0xffffL) << 48);
                     break;
                 default: {
                     if (addr >= 10000) {
@@ -359,6 +408,24 @@ public class Main {
                         switch (plcDataAddr) {
                             case 7:
                                 dimming[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 12:
+                                vMin[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 13:
+                                vMax[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 14:
+                                aMin[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 15:
+                                aMax[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 16:
+                                emerFlag[deviceAddress - 1][plc] = values[index];
+                                break;
+                            case 17:
+                                loadPwmFlag[deviceAddress - 1][plc] = values[index];
                                 break;
                             default:
                                 return ModbusErrorCodes.RTU_UNAVAIBLE_REGISTERS_ADDR;
